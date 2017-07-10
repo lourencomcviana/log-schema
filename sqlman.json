@@ -1,0 +1,8 @@
+{
+  //will import models on that order. Oracle models will overwrite sql models
+  //it can be:
+  //  string name of a model in the dbman models folder
+  //  a url to the model file
+  //  the model json itself
+  "models":["sql","oracle"]
+}

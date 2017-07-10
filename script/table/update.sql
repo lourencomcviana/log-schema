@@ -1,0 +1,16 @@
+create table T_UPDATE
+(
+  data_log    TIMESTAMP(6) not null,
+  seq         NUMBER(3) not null,
+  cod_update  NUMBER(10) not null,
+  data_update DATE default sysdate not null,
+  description VARCHAR2(200) not null
+);
+
+alter table T_UPDATE
+  add constraint PK_UPDATE primary key (DATA_LOG, SEQ, COD_UPDATE)
+  ;
+
+alter table T_UPDATE
+  add constraint FK_T_UPDATE foreign key (DATA_LOG, SEQ)
+  references T_LOG (DATA_LOG, SEQ);
