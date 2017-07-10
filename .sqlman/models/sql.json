@@ -1,0 +1,12 @@
+{
+  "ddl":{
+    "regex":{
+      "create":"create",
+      "alter":"alter",
+      "drop":"drop"
+    }
+  },
+  "table":{
+    "regex":"TABLE +\\w+ +\\(.+\\)"
+  }
+}

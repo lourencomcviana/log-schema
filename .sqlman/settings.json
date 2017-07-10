@@ -1,0 +1,6 @@
+{
+  "models":{
+    "folder":["/models"],
+    "active":["sql"]
+  }
+}

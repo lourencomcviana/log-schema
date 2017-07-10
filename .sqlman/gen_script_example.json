@@ -1,0 +1,31 @@
+{
+  "table":[
+    {
+      "name":"test",
+      "pk":["ID"],
+      "columns":[
+        {
+          "name":"ID",
+          "type":"date",
+          "precision":"2",
+          "notnull":true,
+          "default":0
+        }
+      ]  
+    }
+  ],
+  "fk":[
+    {
+      "table":{
+        "name":"test",
+        "column":"ID"
+      },
+      "reference":{
+        "name":"test_domain",
+        "column":"ID"
+      }
+    }
+  ]
+  
+
+}
