@@ -1,0 +1,17 @@
+CREATE OR REPLACE VIEW LOG_AUDITORIA.V_PARAMETRO AS
+SELECT  p.data_log ,p.SEQ ,p.cod_update  ,p.NAME ,
+  case
+    when px.SEQ is not null then 1
+    when pn.SEQ is not null then 2
+    when pd.SEQ is not null then 3
+  else null end as especializacao,
+  case
+    when px.SEQ is not null then px.VALOR.getClobVal()
+    when pn.SEQ is not null then TO_CLOB(pn.VALOR)
+    when pd.SEQ is not null then to_clob(TO_char(pd.VALOR,'yyyy-mm-dd"T"hh:mi:ss' ))
+  else p.VALOR end as Valor
+
+FROM LOG_AUDITORIA.Tab_Parameter p
+  left join LOG_AUDITORIA.Tab_Parameter_xml px on p.data_log=px.data_log and p.SEQ=px.SEQ and p.NAME=px.NAME and p.cod_update = px.cod_update
+  left join LOG_AUDITORIA.Tab_Parameter_number pn  on p.data_log=pn.data_log and p.SEQ=pn.SEQ and p.NAME=pn.NAME and p.cod_update = pn.cod_update
+  left join LOG_AUDITORIA.Tab_Parameter_data pd  on p.data_log=pd.data_log and p.SEQ=pd.SEQ and p.NAME=pd.NAME and p.cod_update = pd.cod_update;

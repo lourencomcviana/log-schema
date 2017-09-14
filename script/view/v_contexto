@@ -1,0 +1,14 @@
+CREATE OR REPLACE VIEW LOG_AUDITORIA.V_CONTEXTO AS
+SELECT cr.id_relacao,cr.id_relacao_pai,c.id AS ID_CONTEXTO,c.CONTEXTO,ID_PRIORIDADE_DEFAULT,
+     level as nivel,
+     RPAD(' ', (level-1)*2, '  ') || c.CONTEXTO AS tree,
+     CONNECT_BY_ROOT cr.id_relacao AS root,
+     LTRIM(SYS_CONNECT_BY_PATH(cr.id_relacao, '-'), '-') AS path,
+     LTRIM(SYS_CONNECT_BY_PATH(C.CONTEXTO, '.'), '.') AS PATH_CONTEXTO,
+     CONNECT_BY_ISLEAF AS leaf
+
+FROM LOG_AUDITORIA.tab_contexto c
+    join LOG_AUDITORIA.tab_contexto_relacao cr on c.id=cr.id_contexto
+START WITH cr.id_relacao_pai is null
+CONNECT BY cr.id_relacao_pai = PRIOR cr.id_relacao
+ORDER SIBLINGS BY cr.id_relacao_pai;
