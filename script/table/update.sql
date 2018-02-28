@@ -1,4 +1,4 @@
-create table T_UPDATE
+create table LOG_AUDIT.T_UPDATE
 (
   data_log    TIMESTAMP(6) not null,
   seq         NUMBER(3) not null,
@@ -7,10 +7,10 @@ create table T_UPDATE
   description VARCHAR2(200) not null
 );
 
-alter table T_UPDATE
+alter table LOG_AUDIT.T_UPDATE
   add constraint PK_UPDATE primary key (DATA_LOG, SEQ, COD_UPDATE)
   ;
 
-alter table T_UPDATE
+alter table LOG_AUDIT.T_UPDATE
   add constraint FK_T_UPDATE foreign key (DATA_LOG, SEQ)
-  references T_LOG (DATA_LOG, SEQ);
+  references LOG_AUDIT.T_LOG (DATA_LOG, SEQ);

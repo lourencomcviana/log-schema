@@ -1,2 +1,0 @@
-create or replace view log_auditoria.v_prioridade as
-select "ID","DESCRICAO" from LOG_AUDITORIA.tab_Prioridade;

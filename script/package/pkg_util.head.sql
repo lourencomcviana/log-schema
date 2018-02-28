@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE LOG_AUDITORIA.PKG_UTIL IS
+CREATE OR REPLACE PACKAGE LOG_AUDIT.PKG_UTIL IS
   ------------------------------------DECLARA??ES DE TIPO ------------------------------------------------
   TYPE R_SPLITED_STR IS RECORD(
     ID    NUMBER(10),

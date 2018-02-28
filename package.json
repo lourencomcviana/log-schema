@@ -1,0 +1,19 @@
+{
+  "name": "log-schema",
+  "version": "1.0.0",
+  "description": "generate log script",
+  "main": "gen.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lourencomcviana/log-schema.git"
+  },
+  "author": "lourenço viana",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lourencomcviana/log-schema/issues"
+  },
+  "homepage": "https://github.com/lourencomcviana/log-schema#readme"
+}

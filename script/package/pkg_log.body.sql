@@ -1,7 +1,7 @@
-CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
-   --formato adotado para o timestamp da pk do log
+CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
+   --FORMAT adotado para o timestamp da pk do log
   C_DATA_LOG_FORMAT  VARCHAR2(100) := 'YYYY-MM-DD"T"hh24:mi:ss.ff6';
-  G_PRIORIDADE_BANCO NUMBER;
+  G_PRIORITY_DB NUMBER;
 
   function is_number(p_string in varchar2) return int is
     v_new_num number;
@@ -29,14 +29,14 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
       return 0;
   end is_number;
 
-  FUNCTION fnc_extract_ignorar(LOG_REFERENCE xmltype) return NUMBER IS
+  FUNCTION fnc_extract_ignore(LOG_REFERENCE xmltype) return NUMBER IS
   BEGIN
-    IF (LOG_REFERENCE is not null and LOG_REFERENCE.EXTRACT('/log/@ignorar') IS NOT NULL) THEN
-      RETURN LOG_REFERENCE.EXTRACT('/log/@ignorar').getnumberval();
+    IF (LOG_REFERENCE is not null and LOG_REFERENCE.EXTRACT('/log/@ignore') IS NOT NULL) THEN
+      RETURN LOG_REFERENCE.EXTRACT('/log/@ignore').getnumberval();
     else
       return 0;
     END IF;
-  END fnc_extract_ignorar;
+  END fnc_extract_ignore;
 
   FUNCTION fnc_extract_seq(LOG_REFERENCE xmltype) return NUMBER IS
   BEGIN
@@ -67,7 +67,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
     RETURN systimestamp;
   END fnc_extract_data;
 
-  FUNCTION fnc_generate_time_key(prefix varchar2, precisao number, maxsize number) return varchar2 IS
+  FUNCTION fnc_generate_time_key(prefix varchar2, precision_size number, maxsize number) return varchar2 IS
     T_key   varchar2(20);
     T_saida varchar2(200);
     t_size  number;
@@ -79,7 +79,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
       t_size := maxsize;
     end if;
 
-    select case precisao
+    select case precision_size
              when 1 then
               to_char(systimestamp, 'ff')
              when 2 then
@@ -105,7 +105,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
     return  to_timestamp_tz(p_data_str, C_DATA_LOG_FORMAT);
     exception
       when others then
-        dbms_output.put_line('FORMATO: '||C_DATA_LOG_FORMAT);
+        dbms_output.put_line('FORMAT: '||C_DATA_LOG_FORMAT);
         return null;
   END;
 
@@ -124,45 +124,44 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
         t_logkey.data_log := F_TO_LOG_DATA(p_xml.EXTRACT('/log/@data').getstringval());
     end if;
 
-    if(is_number(p_xml,'/log/@ignorar')=1) then
-       t_logkey.ignorar  := p_xml.extract('/log/@ignorar').getnumberval;
+    if(is_number(p_xml,'/log/@ignore')=1) then
+       t_logkey.ignore_this  := p_xml.extract('/log/@ignore').getnumberval;
     end if;
 
     pipe row(t_logkey);
     return;
   END;
   
-  FUNCTION F_CONTEXTO_LEAF(p_ID_RELACAO NUMBER) return t_contextotree_recordtype
+  FUNCTION F_CONTEXT_LEAF(p_ID_CONTEXT NUMBER) return T_CONTEXT_NODEtree_recordtype
     pipelined is
-    t_contextotree r_contextotree_recordtype;
+    t_CONTEXTtree r_CONTEXTtree_recordtype;
   BEGIN
     
-    FOR c_contextotree IN (
-      SELECT cr.id_relacao,cr.id_relacao_pai,c.id AS ID_CONTEXTO,c.CONTEXTO,ID_PRIORIDADE_DEFAULT,
-           level as nivel,
-           RPAD(' ', (level-1)*2, '  ') || c.CONTEXTO AS tree,
-           CONNECT_BY_ROOT cr.id_relacao AS root,
-           LTRIM(SYS_CONNECT_BY_PATH(cr.id_relacao, '-'), '-') AS path,
-           LTRIM(SYS_CONNECT_BY_PATH(C.CONTEXTO, '.'), '.') AS PATH_CONTEXTO,
+    FOR c_CONTEXTtree IN (
+      SELECT cr.ID_CONTEXT,cr.ID_CONTEXT_FATHER,c.CONTEXT,DEFAULT_PRIORITY_LEVEL,
+           level as node_level,
+           RPAD(' ', (level-1)*2, '  ') || c.CONTEXT AS tree,
+           CONNECT_BY_ROOT cr.ID_CONTEXT AS root,
+           LTRIM(SYS_CONNECT_BY_PATH(cr.ID_CONTEXT, '-'), '-') AS path,
+           LTRIM(SYS_CONNECT_BY_PATH(C.CONTEXT, '.'), '.') AS PATH_CONTEXT,
            CONNECT_BY_ISLEAF AS leaf
-      FROM LOG_AUDITORIA.tab_contexto c
-          join LOG_AUDITORIA.tab_contexto_relacao cr on c.id=cr.id_contexto
-      START WITH cr.id_relacao =p_ID_RELACAO
-      CONNECT BY PRIOR cr.id_relacao_pai =  cr.id_relacao
-      ORDER SIBLINGS BY cr.id_relacao_pai  
+      FROM LOG_AUDIT.t_CONTEXT_node c
+          join LOG_AUDIT.t_CONTEXT cr on c.CONTEXT=cr.CONTEXT
+      START WITH cr.ID_CONTEXT =p_ID_CONTEXT
+      CONNECT BY PRIOR cr.ID_CONTEXT_FATHER =  cr.ID_CONTEXT
+      ORDER SIBLINGS BY cr.ID_CONTEXT_FATHER  
     ) LOOP
-      t_contextotree.ID_RELACAO := c_contextotree.ID_RELACAO;
-      t_contextotree.ID_RELACAO_PAI := c_contextotree.ID_RELACAO_PAI;
-      t_contextotree.ID_CONTEXTO := c_contextotree.ID_CONTEXTO;
-      t_contextotree.CONTEXTO := c_contextotree.CONTEXTO;
-      t_contextotree.ID_PRIORIDADE_DEFAULT := c_contextotree.ID_PRIORIDADE_DEFAULT;
-      t_contextotree.NIVEL := c_contextotree.NIVEL;
-      t_contextotree.TREE := c_contextotree.TREE;
-      t_contextotree.ROOT := c_contextotree.ROOT;
-      t_contextotree.PATH := c_contextotree.PATH;
-      t_contextotree.PATH_CONTEXTO := c_contextotree.PATH_CONTEXTO;
-      t_contextotree.LEAF := c_contextotree.LEAF;
-      pipe row(t_contextotree);
+      t_CONTEXTtree.ID_CONTEXT := c_CONTEXTtree.ID_CONTEXT;
+      t_CONTEXTtree.ID_CONTEXT_FATHER := c_CONTEXTtree.ID_CONTEXT_FATHER;
+      t_CONTEXTtree.CONTEXT := c_CONTEXTtree.CONTEXT;
+      t_CONTEXTtree.DEFAULT_PRIORITY_LEVEL := c_CONTEXTtree.DEFAULT_PRIORITY_LEVEL;
+      t_CONTEXTtree.node_level := c_CONTEXTtree.node_level;
+      t_CONTEXTtree.TREE := c_CONTEXTtree.TREE;
+      t_CONTEXTtree.ROOT := c_CONTEXTtree.ROOT;
+      t_CONTEXTtree.PATH := c_CONTEXTtree.PATH;
+      t_CONTEXTtree.PATH_CONTEXT := c_CONTEXTtree.PATH_CONTEXT;
+      t_CONTEXTtree.LEAF := c_CONTEXTtree.LEAF;
+      pipe row(t_CONTEXTtree);
     END LOOP;
     return;
   END;
@@ -192,7 +191,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
     newXml xmltype;
   BEGIN
 
-    newXml:= log_auditoria.pkg_log.F_METADATA_BASIC(p_xml);
+    newXml:= LOG_AUDIT.pkg_log.F_METADATA_BASIC(p_xml);
     for x in(
     SELECT updates
     FROM 
@@ -222,60 +221,60 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
     return newXml;
   END;
 
-  PROCEDURE P_CONTEXTO(
+  PROCEDURE P_CONTEXT(
     P_TEXT VARCHAR2,
-    PO_ID_PRIORIDADE IN OUT NUMBER,
-    O_ID_RELACAO OUT NUMBER
-    --O_PRIORIDADE OUT NUMBER
+    PO_ID_PRIORITY IN OUT NUMBER,
+    O_ID_context OUT NUMBER
+    --O_PRIORITY OUT NUMBER
   ) AS
     T_MAX_LEVEL NUMBER;
-    T_ID_RELACAO NUMBER;
-    O_PRIORIDADE NUMBER;
+    T_ID_CONTEXT NUMBER;
+    O_PRIORITY NUMBER;
     TEXT VARCHAR2(130);
     PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
     TEXT :=upper(P_TEXT);
-    MERGE INTO LOG_AUDITORIA.tab_contexto T
+    MERGE INTO LOG_AUDIT.t_CONTEXT T
     USING(
-      SELECT  C.text AS CONTEXTO
-      FROM TABLE(LOG_AUDITORIA.PKG_UTIL.F_SPLIT_DISTINCT(TEXT)) C
+      SELECT  C.text AS CONTEXT
+      FROM TABLE(LOG_AUDIT.PKG_UTIL.F_SPLIT_DISTINCT(TEXT)) C
       ORDER BY C.ID
-    ) S ON (T.CONTEXTO = S.CONTEXTO)
-    --WHEN MATCHED THEN UPDATE SET T.IDPAI =  S.IDPAI
-    WHEN NOT MATCHED THEN INSERT (T.CONTEXTO)
-         VALUES (S.CONTEXTO )
+    ) S ON (T.CONTEXT = S.CONTEXT)
+    --WHEN MATCHED THEN UPDATE SET T.IDFATHER =  S.IDFATHER
+    WHEN NOT MATCHED THEN INSERT (T.CONTEXT)
+         VALUES (S.CONTEXT )
     ;
 
     select MAX(ID)
     INTO T_MAX_LEVEL
-    from TABLE(LOG_AUDITORIA.PKG_UTIL.F_SPLIT_DISTINCT(TEXT));
+    from TABLE(LOG_AUDIT.PKG_UTIL.F_SPLIT_DISTINCT(TEXT));
 
     DECLARE
-        T_ID_RELACAO NUMBER;
-        T_ID_RELACAO_PAI NUMBER;
+        T_ID_CONTEXT NUMBER;
+        T_ID_CONTEXT_FATHER NUMBER;
       BEGIN
 
       FOR NTREE IN (
-      SELECT
+          SELECT
               NTREE.*,
-               CASE WHEN  NTREE.NIVEL=T_MAX_LEVEL
-                 THEN PO_ID_PRIORIDADE
+               CASE WHEN  NTREE.node_level=T_MAX_LEVEL
+                 THEN PO_ID_PRIORITY
                  ELSE NULL
-              END ID_PRIORIDADE_DEFAULT
+              END DEFAULT_PRIORITY_LEVEL
           FROM (
             with cte as(
-                 select * from TABLE(LOG_AUDITORIA.PKG_UTIL.F_SPLIT(TEXT))
+                 select * from TABLE(LOG_AUDIT.PKG_UTIL.F_SPLIT(TEXT))
             )
             select
-               C.ID id_contexto,C.CONTEXTO,
-               level as nivel,
-               RPAD(' ', (level-1)*2, '  ') || c.CONTEXTO AS tree,
-               CONNECT_BY_ROOT c.id AS root,
-               LTRIM(SYS_CONNECT_BY_PATH(c.id, '-'), '-') AS path,
+               C.CONTEXT,
+               level as node_level,
+               RPAD(' ', (level-1)*2, '  ') || c.CONTEXT AS tree,
+               CONNECT_BY_ROOT c.id_context AS root,
+               LTRIM(SYS_CONNECT_BY_PATH(c.id_context, '-'), '-') AS path,
                CONNECT_BY_ISLEAF AS leaf
 
             from cte  TC
-                JOIN LOG_AUDITORIA.tab_contexto C ON C.CONTEXTO=TC.TEXT
+                JOIN LOG_AUDIT.t_CONTEXT C ON C.CONTEXT=TC.TEXT
                 LEFT JOIN cte TCP ON TC.ID-1=TCP.ID
 
             START WITH TCP.ID IS NULL
@@ -283,35 +282,35 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
             ORDER SIBLINGS BY TCP.ID
             ) NTREE
       ) LOOP
-            --pega a relacao anterior
-            T_ID_RELACAO_PAI:=T_ID_RELACAO;
+            --pega a RELATION anterior
+            T_ID_CONTEXT_FATHER:=T_ID_CONTEXT;
 
             BEGIN
-              SELECT ID_RELACAO,ID_PRIORIDADE_DEFAULT
-              INTO T_ID_RELACAO,O_PRIORIDADE
-              FROM LOG_AUDITORIA.V_CONTEXTO OTREE
-              WHERE NTREE.NIVEL=OTREE.NIVEL AND NTREE.ID_CONTEXTO=OTREE.ID_CONTEXTO AND (T_ID_RELACAO_PAI IS NULL OR T_ID_RELACAO_PAI=ID_RELACAO_PAI)
+              SELECT ID_CONTEXT,DEFAULT_PRIORITY_LEVEL
+              INTO T_ID_CONTEXT,O_PRIORITY
+              FROM LOG_AUDIT.V_CONTEXT OTREE
+              WHERE NTREE.node_level=OTREE.node_level AND NTREE.cONTEXT=OTREE.CONTEXT AND (T_ID_CONTEXT_FATHER IS NULL OR T_ID_CONTEXT_FATHER=ID_CONTEXT_FATHER)
               ;
-              IF(NTREE.ID_PRIORIDADE_DEFAULT is not null)THEN
-                  UPDATE LOG_AUDITORIA.TAB_CONTEXTO_RELACAO
-                  SET ID_PRIORIDADE_DEFAULT =  NTREE.ID_PRIORIDADE_DEFAULT
-                  WHERE ID_RELACAO=T_ID_RELACAO
+              IF(NTREE.DEFAULT_PRIORITY_LEVEL is not null)THEN
+                  UPDATE LOG_AUDIT.t_CONTEXT
+                  SET DEFAULT_PRIORITY_LEVEL =  NTREE.DEFAULT_PRIORITY_LEVEL
+                  WHERE ID_CONTEXT=T_ID_CONTEXT
                   ;
               END IF;
             EXCEPTION WHEN OTHERS THEN
-              --gera id da nova relacao
-              T_ID_RELACAO:= LOG_AUDITORIA.seq_contexto_relacao.nextval;
-              O_PRIORIDADE:=NTREE.ID_PRIORIDADE_DEFAULT;
+              --gera id da nova RELATION
+              T_ID_CONTEXT:= LOG_AUDIT.seq_CONTEXT.nextval;
+              O_PRIORITY:=NTREE.DEFAULT_PRIORITY_LEVEL;
 
-              INSERT INTO LOG_AUDITORIA.TAB_CONTEXTO_RELACAO(ID_RELACAO,ID_RELACAO_PAI,ID_CONTEXTO,ID_PRIORIDADE_DEFAULT)
-              values(T_ID_RELACAO,T_ID_RELACAO_PAI,NTREE.ID_CONTEXTO,NTREE.ID_PRIORIDADE_DEFAULT)
+              INSERT INTO LOG_AUDIT.t_CONTEXT(ID_CONTEXT,ID_CONTEXT_FATHER,context,DEFAULT_PRIORITY_LEVEL)
+              values(T_ID_CONTEXT,T_ID_CONTEXT_FATHER,NTREE.context,NTREE.DEFAULT_PRIORITY_LEVEL)
               ;
             END;
 
         END LOOP;
 
-        O_ID_RELACAO:=T_ID_RELACAO;
-        PO_ID_PRIORIDADE:=O_PRIORIDADE;
+        O_ID_CONTEXT:=T_ID_CONTEXT;
+        PO_ID_PRIORITY:=O_PRIORITY;
       END;
 
 
@@ -319,15 +318,15 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
 
   EXCEPTION
     WHEN OTHERS THEN
-      P_LOG(SQLERRM, 1,'LOG.MANTER.CONTEXTO.ERRO');
+      P_LOG(SQLERRM, 1,'LOG.MAINTAIN.CONTEXT.ERRO');
 
       rollback;
       RAISE;
-  END P_CONTEXTO;
+  END P_CONTEXT;
 
 
-  PROCEDURE P_ADD_INTERNA(p_Nome          IN OUT VARCHAR2,
-                            p_Valor         IN clob,
+  PROCEDURE P_ADD_PRIVATE(p_name          IN OUT VARCHAR2,
+                            p_Value         IN clob,
                             LOG_REFERENCE   in OUT XMLTYPE,
                             dup_error_count in number default 0,
                             o_data          out timestamp,
@@ -337,33 +336,33 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
 
     PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
-    if (length(p_Nome) > 20) then
-      p_Nome := substr(p_Nome, 1, 17) || '...';
+    if (length(p_name) > 20) then
+      p_name := substr(p_name, 1, 17) || '...';
     end if;
 
-    if(fnc_extract_ignorar(LOG_REFERENCE)=0) then
-      --P_LOG(P_ID_PRIORIDADE,LOG_REFERENCE);
+    if(fnc_extract_ignore(LOG_REFERENCE)=0) then
+      --P_LOG(P_ID_PRIORITY,LOG_REFERENCE);
       o_data := fnc_extract_data(LOG_REFERENCE);
       o_seq  := fnc_extract_seq(LOG_REFERENCE);
       o_update := fnc_extract_update(LOG_REFERENCE);
       
-      insert into LOG_AUDITORIA.Tab_Parameter
-      values(o_data, o_seq,o_update, p_Nome, p_Valor);
+      insert into LOG_AUDIT.t_Parameter
+      values(o_data, o_seq,o_update, p_name);
 
       commit;
     end if;
 
     select  XMLQuery('
       copy $i := $p1 modify(
-        insert node <parametro nome="{$nome}">{$valor}</parametro>
+        insert node <parameter name="{$name}">{$Value}</parameter>
                 as last into $i/log/update[last()]
       )
       return $i
       '
     PASSING
       LOG_REFERENCE AS "p1",
-      p_Nome AS "nome",
-      to_char(substr(p_Valor,1,4000)) as "valor"
+      p_name AS "name",
+      to_char(substr(p_Value,1,4000)) as "Value"
     RETURNING CONTENT) INTO LOG_REFERENCE from dual;
 
 
@@ -372,36 +371,36 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
     WHEN DUP_VAL_ON_INDEX THEN
       rollback;
 
-      p_Nome := fnc_generate_time_key(p_Nome, dup_error_count, 20);
-      P_ADD_interna( P_NOME, p_Valor, LOG_REFERENCE, dup_error_count + 1,o_data,o_seq,o_update);
+      p_name := fnc_generate_time_key(p_name, dup_error_count, 20);
+      P_ADD_PRIVATE( P_name, p_Value, LOG_REFERENCE, dup_error_count + 1,o_data,o_seq,o_update);
     WHEN OTHERS THEN
       rollback;
 
       if(dup_error_count<2) then
         DECLARE
           t_log_erro xmltype;
-          T_NOME1 varchar2(20):='PARAMETROS';
-          T_NOME2 varchar2(20):='REFERENCIA';
-          T_NOME3 varchar2(20):='ERRO';
+          T_name1 varchar2(20):='parameterS';
+          T_name2 varchar2(20):='REFERENCIA';
+          T_name3 varchar2(20):='ERRO';
         BEGIN
-          P_LOG('erro ao adicionar parametros', 1,'LOG.CRIAR.P_ADD_INTERNA.ERRO',t_log_erro);
-          P_ADD_INTERNA(T_NOME1,p_Nome,t_log_erro,dup_error_count + 1,o_data,o_seq,o_update);
-          P_ADD_interna(T_NOME3,SQLERRM,t_log_erro,dup_error_count + 1,o_data,o_seq,o_update);
+          P_LOG('erro ao adicionar parameters', 1,'LOG.CRIAR.P_ADD_PRIVATE.ERRO',t_log_erro);
+          P_ADD_PRIVATE(T_name1,p_name,t_log_erro,dup_error_count + 1,o_data,o_seq,o_update);
+          P_ADD_PRIVATE(T_name3,SQLERRM,t_log_erro,dup_error_count + 1,o_data,o_seq,o_update);
           if(LOG_REFERENCE is not null) then
-            P_ADD_INTERNA(T_NOME2,LOG_REFERENCE.getClobVal(),t_log_erro, dup_error_count + 1,o_data,o_seq,o_update);
+            P_ADD_PRIVATE(T_name2,LOG_REFERENCE.getClobVal(),t_log_erro, dup_error_count + 1,o_data,o_seq,o_update);
           else
-            P_ADD_INTERNA(T_NOME2,'N/A',t_log_erro, dup_error_count + 1,o_data,o_seq,o_update);
+            P_ADD_PRIVATE(T_name2,'N/A',t_log_erro, dup_error_count + 1,o_data,o_seq,o_update);
           end if;
         END;
       else
-        dbms_output.put_line('erro desconhecido no log! N?o ? poss?vel adicionar parametros');
+        dbms_output.put_line('erro desconhecido no log! N?o ? poss?vel adicionar parameters');
       end if;
 
       RAISE;
-  END P_ADD_interna;
+  END P_ADD_PRIVATE;
 
-  PROCEDURE P_ADD_INTERNA(p_Nome          IN OUT VARCHAR2,
-                            p_Valor         IN clob,
+  PROCEDURE P_ADD_PRIVATE(p_name          IN OUT VARCHAR2,
+                            p_Value         IN clob,
                             LOG_REFERENCE   in OUT XMLTYPE
 
     ) AS
@@ -411,34 +410,34 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
 
     PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
-    P_ADD_interna( P_NOME, p_Valor, LOG_REFERENCE, 0,T_data,t_seq,t_update);
+    P_ADD_PRIVATE( P_name, p_Value, LOG_REFERENCE, 0,T_data,t_seq,t_update);
   end;
 
-  PROCEDURE P_CONTEXTO_PRIORIDADE(P_ID_PRIORIDADE IN NUMBER,p_Contexto in varchar2, LOG_REFERENCE in OUT XMLTYPE) AS
+  PROCEDURE P_CONTEXT_PRIORITY(P_ID_PRIORITY IN NUMBER,p_CONTEXT in varchar2, LOG_REFERENCE in OUT XMLTYPE) AS
     PRAGMA AUTONOMOUS_TRANSACTION;
     T_data       timestamp(6); --data inicial do log
     T_DATA_CHAR  varchar2(40);
     T_seq        number(3);
     T_log_exists number;
-    T_ID_RELACAO NUMBER;
-    T_PRIORIDADE NUMBER;
+    T_ID_CONTEXT NUMBER;
+    T_PRIORITY NUMBER;
     T_IGNORAR NUMBER:=0;
   BEGIN
 
     T_seq  := fnc_extract_seq(LOG_REFERENCE);
     T_data := fnc_extract_data(LOG_REFERENCE);
-    T_IGNORAR:=fnc_extract_ignorar(LOG_REFERENCE);
-    --VE se o ambiente existe na tabela de prioridades, caso n?o exista, insere e reinicia o processo com T_PRIORIDADE_BANCO preenchido
+    T_IGNORAR:=fnc_extract_ignore(LOG_REFERENCE);
+    --VE se o ambiente existe na tabela de PRIORITYs, caso n?o exista, insere e reinicia o processo com T_PRIORITY_DB preenchido
     IF(T_IGNORAR=0) THEN
-      IF(P_ID_PRIORIDADE IS NOT NULL) THEN
-        IF(P_ID_PRIORIDADE<=0) THEN
+      IF(P_ID_PRIORITY IS NOT NULL) THEN
+        IF(P_ID_PRIORITY<=0) THEN
           T_IGNORAR:=1;
         ELSE
           BEGIN
-            select p.id
-            INTO T_PRIORIDADE
-            from log_auditoria.tab_prioridade p
-            WHERE p.id=P_ID_PRIORIDADE
+            select p.PRIORITY_LEVEL
+            INTO T_PRIORITY
+            from LOG_AUDIT.t_PRIORITY p
+            WHERE p.PRIORITY_LEVEL=P_ID_PRIORITY
             ;
           EXCEPTION WHEN OTHERS THEN
             T_IGNORAR:=1;
@@ -449,39 +448,39 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
       IF(T_IGNORAR=0) THEN
         IF(LOG_REFERENCE is not null) THEN
           BEGIN
-            SELECT L.TIPO
-            INTO T_PRIORIDADE
-            FROM log_auditoria.Tab_Log L WHERE L.DATA_LOG=T_DATA AND L.SEQ=T_SEQ;
+            SELECT L.PRIORITY_LEVEL
+            INTO T_PRIORITY
+            FROM LOG_AUDIT.t_Log L WHERE L.DATA_LOG=T_DATA AND L.SEQ=T_SEQ;
           EXCEPTION WHEN OTHERS THEN
-            T_PRIORIDADE:=NULL;
+            T_PRIORITY:=NULL;
           END;
         END IF;
         
-        IF(p_Contexto is not null) then
-          log_auditoria.pkg_log.P_CONTEXTO(
-             p_Contexto,
-             T_PRIORIDADE,
-             T_ID_RELACAO
+        IF(p_CONTEXT is not null) then
+          LOG_AUDIT.pkg_log.P_CONTEXT(
+             p_CONTEXT,
+             T_PRIORITY,
+             T_ID_CONTEXT
           );
         END IF;
         
-        --associa menor prioridade possivel
-        IF(T_PRIORIDADE IS NULL) THEN
-             select max(p.id)
-             INTO T_PRIORIDADE
-             from log_auditoria.tab_prioridade p;
+        --associa menor PRIORITY possivel
+        IF(T_PRIORITY IS NULL) THEN
+             select max(p.PRIORITY_LEVEL)
+             INTO T_PRIORITY
+             from LOG_AUDIT.t_PRIORITY p;
         END IF;
         
-        IF(T_PRIORIDADE<=G_PRIORIDADE_BANCO) THEN
+        IF(T_PRIORITY<=G_PRIORITY_DB) THEN
           select count(1)
             into T_log_exists
-            from LOG_AUDITORIA.tab_log
+            from LOG_AUDIT.t_log
            where DATA_LOG = T_data
              and seq = T_seq;
 
           if (T_log_exists = 0) then
-            insert into LOG_AUDITORIA.tab_log (data_LOG, seq, tipo,id_relacao)
-            values (T_data, T_seq, T_PRIORIDADE,T_ID_RELACAO);
+            insert into LOG_AUDIT.t_log (data_LOG, seq, PRIORITY_LEVEL,ID_CONTEXT)
+            values (T_data, T_seq, T_PRIORITY,T_ID_CONTEXT);
 
             T_DATA_CHAR := to_char(T_data, C_DATA_LOG_FORMAT);
             select xmlelement("log", xmlattributes(T_DATA_CHAR as "data",T_seq as "seq")) into LOG_REFERENCE from dual;
@@ -498,7 +497,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
 
       commit;
     END IF;
-  END P_CONTEXTO_PRIORIDADE;
+  END P_CONTEXT_PRIORITY;
 
 
   PROCEDURE P_LOG(P_Mensagem IN VARCHAR2) AS
@@ -513,38 +512,38 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
   END P_LOG;
 
 
-  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_Contexto IN Varchar2) AS
+  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_CONTEXT IN Varchar2) AS
     LOG_REFERENCE xmltype;
   BEGIN
-    P_LOG(p_Mensagem ,NULL,P_Contexto ,LOG_REFERENCE);
+    P_LOG(p_Mensagem ,NULL,P_CONTEXT ,LOG_REFERENCE);
   END P_LOG;
 
-  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_Contexto IN Varchar2,  LOG_REFERENCE IN OUT XMLTYPE) AS
+  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_CONTEXT IN Varchar2,  LOG_REFERENCE IN OUT XMLTYPE) AS
   BEGIN
-    P_LOG(p_Mensagem ,NULL,P_Contexto ,LOG_REFERENCE);
+    P_LOG(p_Mensagem ,NULL,P_CONTEXT ,LOG_REFERENCE);
   END P_LOG;
 
 
 
-  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_Prioridade IN NUMBER) AS
+  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_PRIORITY IN NUMBER) AS
     LOG_REFERENCE xmltype;
   BEGIN
-    P_LOG(p_Mensagem ,P_Prioridade,null ,LOG_REFERENCE);
+    P_LOG(p_Mensagem ,P_PRIORITY,null ,LOG_REFERENCE);
   END P_LOG;
 
-  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_Prioridade IN NUMBER,  LOG_REFERENCE IN OUT XMLTYPE) AS
+  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_PRIORITY IN NUMBER,  LOG_REFERENCE IN OUT XMLTYPE) AS
   BEGIN
-    P_LOG(p_Mensagem ,P_Prioridade,null ,LOG_REFERENCE);
+    P_LOG(p_Mensagem ,P_PRIORITY,null ,LOG_REFERENCE);
   END P_LOG;
 
-  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_Prioridade IN NUMBER,P_Contexto IN Varchar2) AS
+  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_PRIORITY IN NUMBER,P_CONTEXT IN Varchar2) AS
     LOG_REFERENCE xmltype;
   BEGIN
-    P_LOG(p_Mensagem ,P_Prioridade,p_contexto ,LOG_REFERENCE);
+    P_LOG(p_Mensagem ,P_PRIORITY,p_CONTEXT ,LOG_REFERENCE);
   END P_LOG;
 
 
-  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_Prioridade IN NUMBER,P_Contexto IN Varchar2,  LOG_REFERENCE IN OUT XMLTYPE) AS
+  PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_PRIORITY IN NUMBER,P_CONTEXT IN Varchar2,  LOG_REFERENCE IN OUT XMLTYPE) AS
     PRAGMA AUTONOMOUS_TRANSACTION;
     T_data     timestamp(6); --data inicial do log
     T_seq      number(3);
@@ -553,29 +552,29 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
     t_mensagem varchar2(4000);
 
   BEGIN
-    P_CONTEXTO_PRIORIDADE(P_PRIORIDADE,p_contexto, LOG_REFERENCE);
+    P_CONTEXT_PRIORITY(P_PRIORITY,p_CONTEXT, LOG_REFERENCE);
 
     T_seq  := fnc_extract_seq(LOG_REFERENCE);
     T_data := fnc_extract_data  (LOG_REFERENCE);
     t_update := fnc_extract_update(LOG_REFERENCE)+1;
 
-     --armazena a mensagem completa como um parametro clob e adiciona a chave do parametro no updatelog quando a mensagem for maior que 200 caracteres.
+     --armazena a mensagem completa como um parameter clob e adiciona a chave do parameter no updatelog quando a mensagem for maior que 200 caracteres.
     if (length(p_Mensagem) > 200) then
       T_temp_key := p_Mensagem;
-      P_add_interna(T_temp_key, p_Mensagem, LOG_REFERENCE);
+      P_add_PRIVATE(T_temp_key, p_Mensagem, LOG_REFERENCE);
       t_mensagem := T_temp_key;
     else
       t_mensagem := p_Mensagem;
     end if;
 
-    if(fnc_extract_ignorar(LOG_REFERENCE)=0) then
-      --sobreescreve valor de t_update quando estiver trabalhando com tabelas
+    if(fnc_extract_ignore(LOG_REFERENCE)=0) then
+      --sobreescreve Value de t_update quando estiver trabalhando com tabelas
       SELECt nvl(MAX(COD_UPDATE), 0) + 1
       into t_update
-          from LOG_AUDITORIA.tab_update ul
+          from LOG_AUDIT.t_update ul
          where uL.DATA_LOG = T_data
            and ul.seq = t_seq;
-      insert into LOG_AUDITORIA.tab_update(data_LOG, seq, COD_UPDATE, descricao)
+      insert into LOG_AUDIT.t_update(data_LOG, seq, COD_UPDATE, description)
        values(T_data,T_seq,t_update,t_mensagem)
       ;
       --select xmlelement("log", xmlattributes(t_update as "update",T_seq as "seq", to_char(T_data, C_DATA_LOG_FORMAT) as "data")) into LOG_REFERENCE from dual;
@@ -585,7 +584,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
     select  XMLQuery('
       copy $i := $p1 modify(
         (: expressao par ainserir e modificar dados basicos do log e das atualizacoes sobre o mesmo :)
-        insert node <update update="{$cod_update}" data="{$data}" descricao="{$descricao}" />
+        insert node <update update="{$cod_update}" data="{$data}" description="{$description}" />
                 as last into $i/log,
 
         if (fn:exists($i/log[1]/@data)) then (
@@ -610,7 +609,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
          LOG_REFERENCE AS "p1",
          to_char(T_data,C_DATA_LOG_FORMAT) AS "datalog",
          t_update as "cod_update",
-         t_mensagem as "descricao",
+         t_mensagem as "description",
          T_seq as "seq",
          to_char(systimestamp, 'yyyy-mm-dd"T"hh:mi:ss') as "data"
       RETURNING CONTENT) INTO LOG_REFERENCE from dual;
@@ -619,29 +618,29 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
   END P_LOG;
 
   
-  PROCEDURE P_LOG_ERRO(P_Mensagem IN VARCHAR2) AS
+  PROCEDURE P_LOG_ERR(P_Mensagem IN VARCHAR2) AS
   BEGIN
-     P_LOG_ERRO(P_Mensagem,'DEFAULT.ERRO');
-  END P_LOG_ERRO;
+     P_LOG_ERR(P_Mensagem,'DEFAULT.ERRO');
+  END P_LOG_ERR;
   
   
-  PROCEDURE P_LOG_ERRO(P_Mensagem IN VARCHAR2,P_Contexto IN Varchar2) AS
+  PROCEDURE P_LOG_ERR(P_Mensagem IN VARCHAR2,P_CONTEXT IN Varchar2) AS
   BEGIN
-     P_LOG_ERRO(P_Mensagem,P_Contexto,NULL);
-  END P_LOG_ERRO;  
+     P_LOG_ERR(P_Mensagem,P_CONTEXT,NULL);
+  END P_LOG_ERR;  
   
   
-  PROCEDURE P_LOG_ERRO(P_Mensagem IN VARCHAR2,P_Contexto IN Varchar2,PARENT_LOG_REFERENCE IN xmltype) AS
+  PROCEDURE P_LOG_ERR(P_Mensagem IN VARCHAR2,P_CONTEXT IN Varchar2,PARENT_LOG_REFERENCE IN xmltype) AS
     ERR_LOG_REFERENCE  xmltype;
   BEGIN
-     P_LOG_ERRO(P_Mensagem,P_Contexto,PARENT_LOG_REFERENCE,ERR_LOG_REFERENCE);
-  END P_LOG_ERRO;
+     P_LOG_ERR(P_Mensagem,P_CONTEXT,PARENT_LOG_REFERENCE,ERR_LOG_REFERENCE);
+  END P_LOG_ERR;
   
   
-  PROCEDURE P_LOG_ERRO(P_Mensagem IN VARCHAR2,P_Contexto IN Varchar2,  PARENT_LOG_REFERENCE IN  xmltype,ERR_LOG_REFERENCE IN OUT xmltype) AS
+  PROCEDURE P_LOG_ERR(P_Mensagem IN VARCHAR2,P_CONTEXT IN Varchar2,  PARENT_LOG_REFERENCE IN  xmltype,ERR_LOG_REFERENCE IN OUT xmltype) AS
     T_REMOVE_SPACE_REGEX VARCHAR2(100):='(^[[:space:]]*|[[:space:]]*$)';
   BEGIN
-    p_log(P_Mensagem, 1, P_Contexto, ERR_LOG_REFERENCE);
+    p_log(P_Mensagem, 1, P_CONTEXT, ERR_LOG_REFERENCE);
     p_add('ERRO',REGEXP_REPLACE (sqlerrm,T_REMOVE_SPACE_REGEX,''), ERR_LOG_REFERENCE); 
     p_add('BACKTRACE',REGEXP_REPLACE (DBMS_UTILITY.FORMAT_ERROR_BACKTRACE,T_REMOVE_SPACE_REGEX,''), ERR_LOG_REFERENCE);
     p_add('CALL_STACK',REGEXP_REPLACE (DBMS_UTILITY.FORMAT_CALL_STACK,T_REMOVE_SPACE_REGEX,''), ERR_LOG_REFERENCE);
@@ -649,56 +648,56 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
     IF(PARENT_LOG_REFERENCE IS NOT NULL) then
       p_add('REFERENCIA',PARENT_LOG_REFERENCE, ERR_LOG_REFERENCE);
     end if;
-  END P_LOG_ERRO;
+  END P_LOG_ERR;
   
-  procedure P_ADD(p_Nome IN VARCHAR2, p_Valor IN VARCHAR2, LOG_REFERENCE in OUT XMLTYPE) AS
-    p_nome_temp varchar2(40) := p_Nome;
+  procedure P_ADD(p_name IN VARCHAR2, p_Value IN VARCHAR2, LOG_REFERENCE in OUT XMLTYPE) AS
+    p_name_temp varchar2(40) := p_name;
   BEGIN
-    P_ADD_interna(p_nome_temp, p_valor, LOG_REFERENCE);
-    if (p_nome_temp <> p_Nome) then
-      dbms_output.put_line('parametro ' || p_Nome || ' ja existia. Novo nome: ' || p_nome_temp);
+    P_ADD_PRIVATE(p_name_temp, p_Value, LOG_REFERENCE);
+    if (p_name_temp <> p_name) then
+      dbms_output.put_line('parameter ' || p_name || ' ja existia. Novo name: ' || p_name_temp);
     end if;
   end;
 
 
-  PROCEDURE P_ADD(p_Nome IN VARCHAR2, p_Valor IN CLOB, LOG_REFERENCE in OUT XMLTYPE) AS
-    p_nome_temp varchar2(40) := p_Nome;
+  PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN CLOB, LOG_REFERENCE in OUT XMLTYPE) AS
+    p_name_temp varchar2(40) := p_name;
   BEGIN
-    P_ADD_interna(p_nome_temp, p_valor, LOG_REFERENCE);
-    if (p_nome_temp <> p_Nome) then
-      dbms_output.put_line('parametro ' || p_Nome || ' ja existia. Novo nome: ' || p_nome_temp);
+    P_ADD_PRIVATE(p_name_temp, p_Value, LOG_REFERENCE);
+    if (p_name_temp <> p_name) then
+      dbms_output.put_line('parameter ' || p_name || ' ja existia. Novo name: ' || p_name_temp);
     end if;
   end;
 
-  PROCEDURE P_ADD(p_Nome IN VARCHAR2, p_Valor IN NUMBER, LOG_REFERENCE in OUT XMLTYPE) AS
+  PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN NUMBER, LOG_REFERENCE in OUT XMLTYPE) AS
     PRAGMA AUTONOMOUS_TRANSACTION;
     T_data      timestamp(6); --data inicial do log
     T_seq       number(3);
     t_update    number(10);
-    p_nome_temp varchar2(40) := p_Nome;
+    p_name_temp varchar2(40) := p_name;
   BEGIN
 
-    P_ADD_interna(p_nome_temp, null, LOG_REFERENCE,0,T_data,T_seq,t_update);
+    P_ADD_PRIVATE(p_name_temp, null, LOG_REFERENCE,0,T_data,T_seq,t_update);
 
-    IF (p_Valor IS NOT NULL AND fnc_extract_ignorar(LOG_REFERENCE)=0) THEN
-      insert into LOG_AUDITORIA.Tab_Parameter_Number
-        SELECT T_data, T_seq,t_update, p_nome_temp, p_Valor
-          FROM LOG_AUDITORIA.tab_log l
+    IF (p_Value IS NOT NULL AND fnc_extract_ignore(LOG_REFERENCE)=0) THEN
+      insert into LOG_AUDIT.t_Parameter_Number
+        SELECT T_data, T_seq,t_update, p_name_temp, p_Value
+          FROM LOG_AUDIT.t_log l
          where L.DATA_LOG = T_data
            and l.seq = t_seq;
       commit;
     END IF;
---insert node attribute  dataType 1 into $i/log/update[last()]/parametro[last()]
+--insert node attribute  dataType 1 into $i/log/update[last()]/parameter[last()]
    select  XMLQuery('
       copy $i := $p1 modify(
-        replace value of node $i/log/update[last()]/parametro[last()] with $valor,
-        insert node attribute  dataType {"2"} into $i/log/update[last()]/parametro[last()]
+        replace value of node $i/log/update[last()]/parameter[last()] with $Value,
+        insert node attribute  dataType {"2"} into $i/log/update[last()]/parameter[last()]
       )
       return $i
       '
       PASSING
          LOG_REFERENCE AS "p1",
-         p_Valor as "valor"
+         p_Value as "Value"
       RETURNING CONTENT) INTO LOG_REFERENCE from dual;
 
   EXCEPTION
@@ -708,20 +707,20 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
       RAISE;
   END P_ADD;
 
-  PROCEDURE P_ADD(p_Nome IN VARCHAR2, p_Valor IN DATE, LOG_REFERENCE in OUT XMLTYPE) AS
+  PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN DATE, LOG_REFERENCE in OUT XMLTYPE) AS
     PRAGMA AUTONOMOUS_TRANSACTION;
     T_data      timestamp(6); --data inicial do log
     T_seq       number(3);
     t_update    number(10);
-    p_nome_temp varchar2(40) := p_Nome;
+    p_name_temp varchar2(40) := p_name;
   BEGIN
 
-    P_ADD_interna(p_nome_temp, null, LOG_REFERENCE,0,T_data,T_seq,t_update);
+    P_ADD_PRIVATE(p_name_temp, null, LOG_REFERENCE,0,T_data,T_seq,t_update);
 
-    IF (p_Valor IS NOT NULL AND fnc_extract_ignorar(LOG_REFERENCE)=0) THEN
-      insert into LOG_AUDITORIA.Tab_Parameter_Data
-        SELECT T_data, T_seq,t_update, p_nome_temp, p_Valor
-          FROM LOG_AUDITORIA.tab_log l
+    IF (p_Value IS NOT NULL AND fnc_extract_ignore(LOG_REFERENCE)=0) THEN
+      insert into LOG_AUDIT.t_Parameter_Date
+        SELECT T_data, T_seq,t_update, p_name_temp, p_Value
+          FROM LOG_AUDIT.t_log l
          where L.DATA_LOG = T_data
            and l.seq = t_seq;
       commit;
@@ -729,14 +728,14 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
 
    select  XMLQuery('
       copy $i := $p1 modify(
-        replace value of node $i/log/update[last()]/parametro[last()] with $valor,
-        insert node attribute  dataType {"3"} into $i/log/update[last()]/parametro[last()]
+        replace value of node $i/log/update[last()]/parameter[last()] with $Value,
+        insert node attribute  dataType {"3"} into $i/log/update[last()]/parameter[last()]
       )
       return $i
       '
    PASSING
       LOG_REFERENCE AS "p1",
-      to_char(p_Valor, 'yyyy-mm-dd"T"hh:mi:ss') as "valor"
+      to_char(p_Value, 'yyyy-mm-dd"T"hh:mi:ss') as "Value"
    RETURNING CONTENT) INTO LOG_REFERENCE from dual;
 
   EXCEPTION
@@ -746,38 +745,38 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
       RAISE;
   END P_ADD;
 
-  PROCEDURE P_ADD(p_Nome IN VARCHAR2, p_Valor IN XMLTYPE, LOG_REFERENCE in OUT XMLTYPE) AS
+  PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN XMLTYPE, LOG_REFERENCE in OUT XMLTYPE) AS
     PRAGMA AUTONOMOUS_TRANSACTION;
     T_data      timestamp(6); --data inicial do log
     T_seq       number(3);
     t_update    number(10);
-    p_nome_temp varchar2(40) := p_Nome;
+    p_name_temp varchar2(40) := p_name;
     T_IMPORTED NUMBER(1):=0;
   BEGIN    
-    -- Se for um xml do tipo log, tenta importar os parametros
-    IF(P_VALOR.EXISTSNODE('/log/update/parametro')=1) THEN
+    -- Se for um xml do tipo log, tenta importar os parameters
+    IF(P_Value.EXISTSNODE('/log/update/parameter')=1) THEN
     	BEGIN
-        P_IMPORT_PARAMETER(p_Valor,LOG_REFERENCE);
+        P_IMPORT_PARAMETER(p_Value,LOG_REFERENCE);
         --ADICIONA REFERENCIA ANTIGA
         
-        P_ADD(P_NOME,F_METADATA_BASIC(P_VALOR),LOG_REFERENCE);
+        P_ADD(P_name,F_METADATA_BASIC(P_Value),LOG_REFERENCE);
        
        
         T_IMPORTED:=1;
         EXCEPTION WHEN OTHERS THEN
-          P_LOG_ERRO('ERRO AO IMPORTAR LOGS', 'LOG.IMPORTAR');
+          P_LOG_ERR('ERRO AO IMPORTAR LOGS', 'LOG.IMPORTAR');
           T_IMPORTED:=0;
           
       END;
     END IF;
     
     IF(T_IMPORTED=0) THEN
-      P_ADD_interna(p_nome_temp, null, LOG_REFERENCE,0,T_data,T_seq,t_update);
+      P_ADD_PRIVATE(p_name_temp, null, LOG_REFERENCE,0,T_data,T_seq,t_update);
 
-      IF (p_Valor IS NOT NULL AND fnc_extract_ignorar(LOG_REFERENCE)=0) THEN
-        insert into LOG_AUDITORIA.Tab_Parameter_Xml
-          SELECT T_data, T_seq,t_update, p_nome_temp, p_Valor
-            FROM LOG_AUDITORIA.tab_log l
+      IF (p_Value IS NOT NULL AND fnc_extract_ignore(LOG_REFERENCE)=0) THEN
+        insert into LOG_AUDIT.t_Parameter_Xml
+          SELECT T_data, T_seq,t_update, p_name_temp, p_Value
+            FROM LOG_AUDIT.t_log l
            where L.DATA_LOG = T_data
              and l.seq = t_seq;
         commit;
@@ -786,14 +785,14 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
       
       select  XMLQuery('
         copy $i := $p1 modify(
-          insert node attribute  dataType {"1"} into $i/log/update[last()]/parametro[last()],
-          insert node $valor into $i/log/update[last()]/parametro[last()]
+          insert node attribute  dataType {"1"} into $i/log/update[last()]/parameter[last()],
+          insert node $Value into $i/log/update[last()]/parameter[last()]
         )
         return $i
         '
      PASSING
         LOG_REFERENCE AS "p1",
-        p_Valor as "valor"
+        p_Value as "Value"
      RETURNING CONTENT) INTO LOG_REFERENCE from dual;
    END IF;
 
@@ -806,16 +805,16 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
 
 
 
-  PROCEDURE P_IMPORT_LOG(p_Nome IN VARCHAR2,p_LOG_XML IN XMLTYPE, LOG_REFERENCE in OUT XMLTYPE) AS
+  PROCEDURE P_IMPORT_LOG(p_name IN VARCHAR2,p_LOG_XML IN XMLTYPE, LOG_REFERENCE in OUT XMLTYPE) AS
     T_PARAMETER_REFERENCE XMLTYPE;
   BEGIN
     
-    SELECT LOG_AUDITORIA.PKG_LOG.F_METADATA_BASIC(p_LOG_XML)
+    SELECT LOG_AUDIT.PKG_LOG.F_METADATA_BASIC(p_LOG_XML)
     INTO T_PARAMETER_REFERENCE
     FROM DUAL;
     
     P_log('IMPORTADO LOG',LOG_REFERENCE);
-    P_ADD(p_Nome,T_PARAMETER_REFERENCE ,LOG_REFERENCE);
+    P_ADD(p_name,T_PARAMETER_REFERENCE ,LOG_REFERENCE);
     
     FOR C_UPDATE IN (
       SELECT *
@@ -825,12 +824,12 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
         COLUMNS 
           cod_Update   number  PATH '@update',
           data_Update  VARCHAR2(19) PATH '@data',
-          descricao  VARCHAR2(200) PATH '@descricao',
-          parametro  xmltype PATH '/parametro'
+          description  VARCHAR2(200) PATH '@description',
+          parameter  xmltype PATH '/parameter'
       )
     ) LOOP
-      P_LOG(C_UPDATE.DESCRICAO,LOG_REFERENCE);
-      P_IMPORT_PARAMETER( C_UPDATE.PARAMETRO,LOG_REFERENCE);
+      P_LOG(C_UPDATE.description,LOG_REFERENCE);
+      P_IMPORT_PARAMETER( C_UPDATE.parameter,LOG_REFERENCE);
     END LOOP;
   END;
   
@@ -840,51 +839,52 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDITORIA.PKG_LOG IS
      FOR C_PARAMETER IN (
         SELECT *
         FROM 
-          XMLTable('for $i in //parametro return $i'
+          XMLTable('for $i in //parameter return $i'
           PASSING p_PARAMETERS_XML
           COLUMNS 
-            nome  VARCHAR2(19)  PATH '@nome',
-            valor xmltype PATH '/parametro',
+            name  VARCHAR2(19)  PATH '@name',
+            Value xmltype PATH '/parameter',
             dataType NUMBER PATH '@dataType'
         )
       ) LOOP
         IF( C_PARAMETER.dataType=1) THEN
-          P_ADD(C_PARAMETER.NOME,C_PARAMETER.VALOR.extract('/parametro/*'),LOG_REFERENCE);
+          P_ADD(C_PARAMETER.name,C_PARAMETER.Value.extract('/parameter/*'),LOG_REFERENCE);
         ELSIF( C_PARAMETER.dataType=2) THEN
-          P_ADD(C_PARAMETER.NOME,C_PARAMETER.VALOR.extract('/parametro/text()').getnumberVal(),LOG_REFERENCE);
+          P_ADD(C_PARAMETER.name,C_PARAMETER.Value.extract('/parameter/text()').getnumberVal(),LOG_REFERENCE);
         ELSIF( C_PARAMETER.dataType=3) THEN
-          P_ADD(C_PARAMETER.NOME,TO_DATE(C_PARAMETER.VALOR.extract('/parametro/text()').getstringval(),'yyyy-mm-dd"T"hh:mi:ss'),LOG_REFERENCE);
+          P_ADD(C_PARAMETER.name,TO_DATE(C_PARAMETER.Value.extract('/parameter/text()').getstringval(),'yyyy-mm-dd"T"hh:mi:ss'),LOG_REFERENCE);
         ELSE
-          P_ADD(C_PARAMETER.NOME,C_PARAMETER.VALOR.extract('/parametro/text()').getClobVal(),LOG_REFERENCE);
+          P_ADD(C_PARAMETER.name,C_PARAMETER.Value.extract('/parameter/text()').getClobVal(),LOG_REFERENCE);
         END IF;
       END LOOP;
   END;
   
 -- Setando variaveis estaticas do ambiente
+
 BEGIN
 
  DECLARE
-    T_PRIORIDADE_BANCO NUMBER;
+    T_PRIORITY_DB NUMBER;
  BEGIN
-    select min(ID)
-    INTO G_PRIORIDADE_BANCO
-    from Tab_Prioridade
-    WHERE  REGEXP_LIKE (UPPER(sys_context('userenv','instance_name')),UPPER('^'||DESCRICAO)||'\d*$','i')
+    select min(PRIORITY_LEVEL)
+    INTO G_PRIORITY_DB
+    from log_audit.t_PRIORITY
+    WHERE  REGEXP_LIKE (UPPER(sys_context('userenv','instance_name')),UPPER('^'||description)||'\d*$','i')
     ;
 
 
   EXCEPTION WHEN OTHERS THEN
-    select nvl(max(id),0)+1
-    into T_PRIORIDADE_BANCO
-    from  log_auditoria.TAB_PRIORIDADE;
+    select nvl(max(PRIORITY_LEVEL),0)+1
+    into T_PRIORITY_DB
+    from  LOG_AUDIT.t_PRIORITY;
 
-    INSERT INTO LOG_AUDITORIA.TAB_PRIORIDADE(ID,DESCRICAO)
-    VALUES(T_PRIORIDADE_BANCO,UPPER(sys_context('userenv','instance_name')))
+    INSERT INTO LOG_AUDIT.t_PRIORITY(PRIORITY_LEVEL,description)
+    VALUES(T_PRIORITY_DB,UPPER(sys_context('userenv','instance_name')))
     ;
-    G_PRIORIDADE_BANCO:=T_PRIORIDADE_BANCO;
-    DBMS_OUTPUT.PUT_LINE(G_PRIORIDADE_BANCO);
+    G_PRIORITY_DB:=T_PRIORITY_DB;
+    DBMS_OUTPUT.PUT_LINE(G_PRIORITY_DB);
     
-    P_LOG('INSERIU PRIORIDADE '|| G_PRIORIDADE_BANCO);
+    P_LOG('INSERT PRIORITY '|| G_PRIORITY_DB);
   END;
 
 
