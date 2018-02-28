@@ -6,7 +6,7 @@ create table LOG_AUDIT.T_log
   --security sequence
   SEQ         NUMBER(3) not null, 
   --log context
-  ID_CONTEXT  NUMBER(10) NOT NULL,
+  ID_CONTEXT  NUMBER(10) ,
   --defines where your log can or can't run
   priority_level NUMBER(6) not null
 );

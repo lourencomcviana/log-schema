@@ -3,6 +3,33 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
   C_DATA_LOG_FORMAT  VARCHAR2(100) := 'YYYY-MM-DD"T"hh24:mi:ss.ff6';
   G_PRIORITY_DB NUMBER;
 
+  PROCEDURE P_SET
+    AS   T_PRIORITY_DB NUMBER; 
+      BEGIN
+ 
+    select min(PRIORITY_LEVEL)
+    INTO G_PRIORITY_DB
+    from log_audit.t_PRIORITY
+    WHERE  1=1
+      or UPPER(sys_context('userenv','service_name'))=description
+      or UPPER(sys_context('userenv','instance_name'))=description
+      or REGEXP_LIKE (UPPER(sys_context('userenv','instance_name')),UPPER('^'||description)||'\d*$','i')
+    ;
+
+  EXCEPTION WHEN OTHERS THEN
+    select nvl(max(PRIORITY_LEVEL),0)+1
+    into T_PRIORITY_DB
+    from  LOG_AUDIT.t_PRIORITY;
+
+    INSERT INTO LOG_AUDIT.t_PRIORITY(PRIORITY_LEVEL,description)
+    VALUES(T_PRIORITY_DB,UPPER(sys_context('userenv','instance_name')))
+    ;
+    G_PRIORITY_DB:=T_PRIORITY_DB;
+    DBMS_OUTPUT.PUT_LINE(G_PRIORITY_DB);
+    
+    P_LOG('INSERT PRIORITY '|| G_PRIORITY_DB);
+  END;
+
   function is_number(p_string in varchar2) return int is
     v_new_num number;
   begin
@@ -234,7 +261,8 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
     PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
     TEXT :=upper(P_TEXT);
-    MERGE INTO LOG_AUDIT.t_CONTEXT T
+
+    MERGE INTO LOG_AUDIT.t_CONTEXT_node T
     USING(
       SELECT  C.text AS CONTEXT
       FROM TABLE(LOG_AUDIT.PKG_UTIL.F_SPLIT_DISTINCT(TEXT)) C
@@ -248,8 +276,10 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
     select MAX(ID)
     INTO T_MAX_LEVEL
     from TABLE(LOG_AUDIT.PKG_UTIL.F_SPLIT_DISTINCT(TEXT));
-
+    
+   
     DECLARE
+
         T_ID_CONTEXT NUMBER;
         T_ID_CONTEXT_FATHER NUMBER;
       BEGIN
@@ -263,34 +293,34 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
               END DEFAULT_PRIORITY_LEVEL
           FROM (
             with cte as(
-                 select * from TABLE(LOG_AUDIT.PKG_UTIL.F_SPLIT(TEXT))
+               select * from TABLE(LOG_AUDIT.PKG_UTIL.F_SPLIT(TEXT))
             )
-            select
-               C.CONTEXT,
-               level as node_level,
-               RPAD(' ', (level-1)*2, '  ') || c.CONTEXT AS tree,
-               CONNECT_BY_ROOT c.id_context AS root,
-               LTRIM(SYS_CONNECT_BY_PATH(c.id_context, '-'), '-') AS path,
-               CONNECT_BY_ISLEAF AS leaf
-
+            SELECT   C.CONTEXT,
+              level as node_level,
+              RPAD(' ', (level-1)*2, '  ') || c.CONTEXT AS tree,
+              CONNECT_BY_ROOT c.CONTEXT AS root,
+              LTRIM(SYS_CONNECT_BY_PATH(c.CONTEXT, '-'), '-') AS path,
+              CONNECT_BY_ISLEAF AS leaf       
             from cte  TC
-                JOIN LOG_AUDIT.t_CONTEXT C ON C.CONTEXT=TC.TEXT
-                LEFT JOIN cte TCP ON TC.ID-1=TCP.ID
-
+              JOIN LOG_AUDIT.t_CONTEXT_NODE C ON C.CONTEXT=TC.TEXT
+              LEFT JOIN cte TCP ON TC.ID-1=TCP.ID
             START WITH TCP.ID IS NULL
             CONNECT BY TCP.ID = PRIOR TC.ID
             ORDER SIBLINGS BY TCP.ID
-            ) NTREE
+
+          ) NTREE
       ) LOOP
             --pega a RELATION anterior
             T_ID_CONTEXT_FATHER:=T_ID_CONTEXT;
 
             BEGIN
+
               SELECT ID_CONTEXT,DEFAULT_PRIORITY_LEVEL
               INTO T_ID_CONTEXT,O_PRIORITY
               FROM LOG_AUDIT.V_CONTEXT OTREE
               WHERE NTREE.node_level=OTREE.node_level AND NTREE.cONTEXT=OTREE.CONTEXT AND (T_ID_CONTEXT_FATHER IS NULL OR T_ID_CONTEXT_FATHER=ID_CONTEXT_FATHER)
               ;
+ 
               IF(NTREE.DEFAULT_PRIORITY_LEVEL is not null)THEN
                   UPDATE LOG_AUDIT.t_CONTEXT
                   SET DEFAULT_PRIORITY_LEVEL =  NTREE.DEFAULT_PRIORITY_LEVEL
@@ -312,8 +342,6 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
         O_ID_CONTEXT:=T_ID_CONTEXT;
         PO_ID_PRIORITY:=O_PRIORITY;
       END;
-
-
     commit;
 
   EXCEPTION
@@ -423,16 +451,19 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
     T_PRIORITY NUMBER;
     T_IGNORAR NUMBER:=0;
   BEGIN
-
+    
+   
     T_seq  := fnc_extract_seq(LOG_REFERENCE);
     T_data := fnc_extract_data(LOG_REFERENCE);
     T_IGNORAR:=fnc_extract_ignore(LOG_REFERENCE);
+
     --VE se o ambiente existe na tabela de PRIORITYs, caso n?o exista, insere e reinicia o processo com T_PRIORITY_DB preenchido
     IF(T_IGNORAR=0) THEN
       IF(P_ID_PRIORITY IS NOT NULL) THEN
         IF(P_ID_PRIORITY<=0) THEN
           T_IGNORAR:=1;
         ELSE
+
           BEGIN
             select p.PRIORITY_LEVEL
             INTO T_PRIORITY
@@ -443,7 +474,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
             T_IGNORAR:=1;
           END;
         END IF;
-      END IF;
+    END IF;
  
       IF(T_IGNORAR=0) THEN
         IF(LOG_REFERENCE is not null) THEN
@@ -456,12 +487,9 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
           END;
         END IF;
         
-        IF(p_CONTEXT is not null) then
-          LOG_AUDIT.pkg_log.P_CONTEXT(
-             p_CONTEXT,
-             T_PRIORITY,
-             T_ID_CONTEXT
-          );
+        IF(P_CONTEXT IS NOT NULL) THEN
+   
+          LOG_AUDIT.PKG_LOG.P_CONTEXT( P_CONTEXT,T_PRIORITY, T_ID_CONTEXT);
         END IF;
         
         --associa menor PRIORITY possivel
@@ -552,6 +580,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
     t_mensagem varchar2(4000);
 
   BEGIN
+    
     P_CONTEXT_PRIORITY(P_PRIORITY,p_CONTEXT, LOG_REFERENCE);
 
     T_seq  := fnc_extract_seq(LOG_REFERENCE);
@@ -568,12 +597,15 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
     end if;
 
     if(fnc_extract_ignore(LOG_REFERENCE)=0) then
+    
       --sobreescreve Value de t_update quando estiver trabalhando com tabelas
+      
       SELECt nvl(MAX(COD_UPDATE), 0) + 1
       into t_update
           from LOG_AUDIT.t_update ul
          where uL.DATA_LOG = T_data
            and ul.seq = t_seq;
+
       insert into LOG_AUDIT.t_update(data_LOG, seq, COD_UPDATE, description)
        values(T_data,T_seq,t_update,t_mensagem)
       ;
@@ -652,22 +684,48 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
   
   procedure P_ADD(p_name IN VARCHAR2, p_Value IN VARCHAR2, LOG_REFERENCE in OUT XMLTYPE) AS
     p_name_temp varchar2(40) := p_name;
+    t_value clob:=CAST(p_Value AS CLOB);
   BEGIN
-    P_ADD_PRIVATE(p_name_temp, p_Value, LOG_REFERENCE);
-    if (p_name_temp <> p_name) then
-      dbms_output.put_line('parameter ' || p_name || ' ja existia. Novo name: ' || p_name_temp);
-    end if;
+    P_ADD(p_name_temp,t_value,LOG_REFERENCE);
   end;
 
 
   PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN CLOB, LOG_REFERENCE in OUT XMLTYPE) AS
+     PRAGMA AUTONOMOUS_TRANSACTION;
+    T_data      timestamp(6); --data inicial do log
+    T_seq       number(3);
+    t_update    number(10);
     p_name_temp varchar2(40) := p_name;
   BEGIN
-    P_ADD_PRIVATE(p_name_temp, p_Value, LOG_REFERENCE);
-    if (p_name_temp <> p_name) then
-      dbms_output.put_line('parameter ' || p_name || ' ja existia. Novo name: ' || p_name_temp);
-    end if;
-  end;
+    P_ADD_PRIVATE(p_name_temp, null, LOG_REFERENCE,0,T_data,T_seq,t_update);
+
+    IF (p_Value IS NOT NULL AND fnc_extract_ignore(LOG_REFERENCE)=0) THEN
+      insert into LOG_AUDIT.t_Parameter_CLOB
+        SELECT T_data, T_seq,t_update, p_name_temp, p_Value
+          FROM LOG_AUDIT.t_log l
+         where L.DATA_LOG = T_data
+           and l.seq = t_seq;
+      commit;
+    END IF;
+--insert node attribute  dataType 1 into $i/log/update[last()]/parameter[last()]
+   select  XMLQuery('
+      copy $i := $p1 modify(
+        replace value of node $i/log/update[last()]/parameter[last()] with $Value,
+        insert node attribute  dataType {"2"} into $i/log/update[last()]/parameter[last()]
+      )
+      return $i
+      '
+      PASSING
+         LOG_REFERENCE AS "p1",
+         cast(substr(p_Value,1,4000) as varchar2(4000)) as "Value"
+      RETURNING CONTENT) INTO LOG_REFERENCE from dual;
+
+  EXCEPTION
+    WHEN OTHERS THEN
+      P_LOG(SQLERRM, 1,'LOG.CRIAR.P_ADD.ERRO.NUMBER');
+      rollback;
+      RAISE;
+  END P_ADD;
 
   PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN NUMBER, LOG_REFERENCE in OUT XMLTYPE) AS
     PRAGMA AUTONOMOUS_TRANSACTION;
@@ -863,29 +921,7 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
 
 BEGIN
 
- DECLARE
-    T_PRIORITY_DB NUMBER;
- BEGIN
-    select min(PRIORITY_LEVEL)
-    INTO G_PRIORITY_DB
-    from log_audit.t_PRIORITY
-    WHERE  REGEXP_LIKE (UPPER(sys_context('userenv','instance_name')),UPPER('^'||description)||'\d*$','i')
-    ;
-
-
-  EXCEPTION WHEN OTHERS THEN
-    select nvl(max(PRIORITY_LEVEL),0)+1
-    into T_PRIORITY_DB
-    from  LOG_AUDIT.t_PRIORITY;
-
-    INSERT INTO LOG_AUDIT.t_PRIORITY(PRIORITY_LEVEL,description)
-    VALUES(T_PRIORITY_DB,UPPER(sys_context('userenv','instance_name')))
-    ;
-    G_PRIORITY_DB:=T_PRIORITY_DB;
-    DBMS_OUTPUT.PUT_LINE(G_PRIORITY_DB);
-    
-    P_LOG('INSERT PRIORITY '|| G_PRIORITY_DB);
-  END;
+  P_SET;
 
 
 

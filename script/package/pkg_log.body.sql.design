@@ -13,7 +13,7 @@
     <ConnectionString>User Id=liquibase;Server=ORACLE12C;Unicode=True;Connection Timeout=0</ConnectionString>
     <Database />
   </Connection>
-  <Views ShowAdditionalViews="False" IsLayoutActiveAttribute="True" MainViewAttribute="Code" MainViewScale="62">
+  <Views ShowAdditionalViews="False" IsLayoutActiveAttribute="True" MainViewAttribute="Code" MainViewScale="82">
     <View Name="Design" Visible="False" />
     <View Name="Code" Active="True" Visible="True">
       <Data />

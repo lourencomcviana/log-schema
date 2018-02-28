@@ -17,5 +17,5 @@ FROM LOG_AUDIT.t_Parameter p
   left join LOG_AUDIT.t_Parameter_xml px on p.data_log=px.data_log and p.SEQ=px.SEQ and p.NAME=px.NAME and p.cod_update = px.cod_update
   left join LOG_AUDIT.t_Parameter_number pn  on p.data_log=pn.data_log and p.SEQ=pn.SEQ and p.NAME=pn.NAME and p.cod_update = pn.cod_update
   left join LOG_AUDIT.t_Parameter_date pd  on p.data_log=pd.data_log and p.SEQ=pd.SEQ and p.NAME=pd.NAME and p.cod_update = pd.cod_update
-  left join LOG_AUDIT.t_Parameter_clob pc  on p.data_log=pd.data_log and p.SEQ=pd.SEQ and p.NAME=pd.NAME and p.cod_update = pd.cod_update
+  left join LOG_AUDIT.t_Parameter_clob pc  on p.data_log=pc.data_log and p.SEQ=pc.SEQ and p.NAME=pc.NAME and p.cod_update = pc.cod_update
   ;
