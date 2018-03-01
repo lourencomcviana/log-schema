@@ -4,6 +4,7 @@ begin
   --delete log_audit.t_temp;
   LOG_AUDIT.pkg_log.p_log('most simpler log');
   
+  
   LOG_AUDIT.pkg_log.p_log('categorizing a log by its context','TEST.CONTEXT');
 
   LOG_AUDIT.pkg_log.p_log('number 1 is the priority of the log, it will only run on servers with a priority level smaller than itself',1,'TEST.CONTEXT');
@@ -23,15 +24,13 @@ begin
   LOG_AUDIT.pkg_log.p_log('Note that in the news p_log of the same reference we do not need to pass context or priority. The first context and priority are aways used',T_LOG_REF);
   LOG_AUDIT.pkg_log.p_log('look at xml content of log_audit.v_log or join tab_log with tab_update to see all updates from a log',T_LOG_REF);
 
-
-  
 end;
 
 /
 select * from log_audit.V_LOG_RECENT;
 SELECT * FROM LOG_AUDIT.V_PARAMETER;
-select * from LOG_AUDIT.T_CONTEXT_NODE;
-select * from LOG_AUDIT.T_CONTEXT;
+select * from LOG_AUDIT.V_CONTEXT;
+select * from LOG_AUDIT.t_PRIORITY;
 
 /*
 - you can delete theses tests the code bellow 
@@ -47,4 +46,5 @@ DELETE LOG_AUDIT.T_LOG;
 
 DELETE LOG_AUDIT.T_CONTEXT;
 DELETE LOG_AUDIT.T_CONTEXT_NODE;
+
 */

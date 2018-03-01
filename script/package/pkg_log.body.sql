@@ -4,9 +4,10 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
   G_PRIORITY_DB NUMBER;
 
   PROCEDURE P_SET
-    AS   T_PRIORITY_DB NUMBER; 
-      BEGIN
- 
+    AS 
+    T_PRIORITY_DB NUMBER; 
+  BEGIN
+    
     select min(PRIORITY_LEVEL)
     INTO G_PRIORITY_DB
     from log_audit.t_PRIORITY
@@ -16,18 +17,23 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
       or REGEXP_LIKE (UPPER(sys_context('userenv','instance_name')),UPPER('^'||description)||'\d*$','i')
     ;
 
-  EXCEPTION WHEN OTHERS THEN
-    select nvl(max(PRIORITY_LEVEL),0)+1
-    into T_PRIORITY_DB
-    from  LOG_AUDIT.t_PRIORITY;
+    if(G_PRIORITY_DB is null) then
+       
+  
+        INSERT INTO LOG_AUDIT.t_PRIORITY(PRIORITY_LEVEL,DATABASE,description)
+        select nvl(max(PRIORITY_LEVEL),0)+1 ,UPPER(sys_context('userenv','instance_name')),'auto-inserted'
+        from  LOG_AUDIT.t_PRIORITY;
+      
+        select max(PRIORITY_LEVEL)
+        into T_PRIORITY_DB
+        from  LOG_AUDIT.t_PRIORITY;
 
-    INSERT INTO LOG_AUDIT.t_PRIORITY(PRIORITY_LEVEL,description)
-    VALUES(T_PRIORITY_DB,UPPER(sys_context('userenv','instance_name')))
-    ;
-    G_PRIORITY_DB:=T_PRIORITY_DB;
-    DBMS_OUTPUT.PUT_LINE(G_PRIORITY_DB);
+        G_PRIORITY_DB:=T_PRIORITY_DB;
+    end if;
     
-    P_LOG('INSERT PRIORITY '|| G_PRIORITY_DB);
+
+     
+    commit;
   END;
 
   function is_number(p_string in varchar2) return int is
@@ -451,8 +457,6 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
     T_PRIORITY NUMBER;
     T_IGNORAR NUMBER:=0;
   BEGIN
-    
-   
     T_seq  := fnc_extract_seq(LOG_REFERENCE);
     T_data := fnc_extract_data(LOG_REFERENCE);
     T_IGNORAR:=fnc_extract_ignore(LOG_REFERENCE);
@@ -580,7 +584,6 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
     t_mensagem varchar2(4000);
 
   BEGIN
-    
     P_CONTEXT_PRIORITY(P_PRIORITY,p_CONTEXT, LOG_REFERENCE);
 
     T_seq  := fnc_extract_seq(LOG_REFERENCE);
@@ -646,7 +649,10 @@ CREATE OR REPLACE PACKAGE BODY LOG_AUDIT.PKG_LOG IS
          to_char(systimestamp, 'yyyy-mm-dd"T"hh:mi:ss') as "data"
       RETURNING CONTENT) INTO LOG_REFERENCE from dual;
 
-
+    EXCEPTION
+    WHEN OTHERS THEN
+      commit;
+      RAISE;
   END P_LOG;
 
   
