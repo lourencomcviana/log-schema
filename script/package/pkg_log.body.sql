@@ -822,7 +822,7 @@ PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN XMLTYPE, LOG_REFERENCE in OUT XML
   T_IMPORTED NUMBER(1):=0;
 BEGIN    
   -- Se for um xml do tipo log, tenta importar os parameters
-  IF(P_Value.EXISTSNODE('/log/update/parameter')=1) THEN
+  IF(p_Value IS NOT NULL AND P_Value.EXISTSNODE('/log/update/parameter')=1) THEN
   	BEGIN
       P_IMPORT_PARAMETER(p_Value,LOG_REFERENCE);
       --ADICIONA REFERENCIA ANTIGA
