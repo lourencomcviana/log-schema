@@ -699,6 +699,7 @@ BEGIN
   P_ADD(p_name_temp,t_value,LOG_REFERENCE);
 end;
 
+  
 
 PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN CLOB, LOG_REFERENCE in OUT XMLTYPE) AS
    PRAGMA AUTONOMOUS_TRANSACTION;
@@ -710,24 +711,27 @@ BEGIN
   P_ADD_PRIVATE(p_name_temp, null, LOG_REFERENCE,0,T_data,T_seq,t_update);
 
   IF (p_Value IS NOT NULL AND fnc_extract_ignore(LOG_REFERENCE)=0) THEN
+    
     insert into LOG_AUDIT.t_Parameter_CLOB
       SELECT T_data, T_seq,t_update, p_name_temp, p_Value
         FROM LOG_AUDIT.t_log l
        where L.DATA_LOG = T_data
          and l.seq = t_seq;
     commit;
+  
   END IF;
+  
 --insert node attribute  dataType 1 into $i/log/update[last()]/parameter[last()]
  select  XMLQuery('
     copy $i := $p1 modify(
       replace value of node $i/log/update[last()]/parameter[last()] with $Value,
-      insert node attribute  dataType {"2"} into $i/log/update[last()]/parameter[last()]
+      insert node attribute  dataType {"4"} into $i/log/update[last()]/parameter[last()]
     )
     return $i
     '
     PASSING
        LOG_REFERENCE AS "p1",
-       cast(substr(p_Value,1,4000) as varchar2(4000)) as "Value"
+       cast(substr(p_Value,1,3999) as varchar2(4000)) as "Value"
     RETURNING CONTENT) INTO LOG_REFERENCE from dual;
 
 EXCEPTION
@@ -822,7 +826,7 @@ PROCEDURE P_ADD(p_name IN VARCHAR2, p_Value IN XMLTYPE, LOG_REFERENCE in OUT XML
   T_IMPORTED NUMBER(1):=0;
 BEGIN    
   -- Se for um xml do tipo log, tenta importar os parameters
-  IF(p_Value IS NOT NULL AND P_Value.EXISTSNODE('/log/update/parameter')=1) THEN
+  IF(P_Value.EXISTSNODE('/log/update/parameter')=1) THEN
   	BEGIN
       P_IMPORT_PARAMETER(p_Value,LOG_REFERENCE);
       --ADICIONA REFERENCIA ANTIGA
@@ -832,7 +836,7 @@ BEGIN
      
       T_IMPORTED:=1;
       EXCEPTION WHEN OTHERS THEN
-        P_LOG_ERR('ERRO AO IMPORTAR LOGS', 'LOG.IMPORTAR');
+        P_LOG_ERR('ERROR IMPORTING LOGS', 'LOG.IMPORT');
         T_IMPORTED:=0;
         
     END;
@@ -935,18 +939,41 @@ BEGIN
         COLUMNS 
           name  VARCHAR2(19)  PATH '@name',
           Value xmltype PATH '/parameter',
-          dataType NUMBER PATH '@dataType'
+          dataType NUMBER PATH '@dataType',
+          this xmltype path '.'
       )
     ) LOOP
-      IF( C_PARAMETER.dataType=1) THEN
-        P_ADD(C_PARAMETER.name,C_PARAMETER.Value.extract('/parameter/*'),LOG_REFERENCE);
-      ELSIF( C_PARAMETER.dataType=2) THEN
-        P_ADD(C_PARAMETER.name,C_PARAMETER.Value.extract('/parameter/text()').getnumberVal(),LOG_REFERENCE);
-      ELSIF( C_PARAMETER.dataType=3) THEN
-        P_ADD(C_PARAMETER.name,TO_DATE(C_PARAMETER.Value.extract('/parameter/text()').getstringval(),'yyyy-mm-dd"T"hh:mi:ss'),LOG_REFERENCE);
-      ELSE
-        P_ADD(C_PARAMETER.name,C_PARAMETER.Value.extract('/parameter/text()').getClobVal(),LOG_REFERENCE);
-      END IF;
+      begin
+        IF( C_PARAMETER.dataType=1) THEN
+          P_ADD(C_PARAMETER.name,C_PARAMETER.Value.extract('/parameter/*'),LOG_REFERENCE);
+        ELSIF( C_PARAMETER.dataType=2) THEN
+          P_ADD(C_PARAMETER.name,C_PARAMETER.Value.extract('/parameter/text()').getnumberVal(),LOG_REFERENCE);
+        ELSIF( C_PARAMETER.dataType=3) THEN
+          P_ADD(C_PARAMETER.name,TO_DATE(C_PARAMETER.Value.extract('/parameter/text()').getstringval(),'yyyy-mm-dd"T"hh:mi:ss'),LOG_REFERENCE);
+        ELSE
+          
+          declare 
+            t_clob clob;
+          begin
+            select EXTRACTVALUE(C_PARAMETER.Value,'/parameter/text()')
+            into t_clob
+            from dual;
+            
+            if(t_clob is not null) then
+              P_ADD(C_PARAMETER.name,t_clob,LOG_REFERENCE);
+            else
+              P_ADD(C_PARAMETER.name,'NULL',LOG_REFERENCE);
+            end if;
+          end;
+        END IF;
+  
+        exception when others then
+          P_log('could not import parameter',LOG_REFERENCE);
+          P_ADD('error',SQLERRM,LOG_REFERENCE);
+          P_ADD('name',C_PARAMETER.name,LOG_REFERENCE);
+          P_ADD('dataType',C_PARAMETER.dataType,LOG_REFERENCE);
+           P_ADD('this',C_PARAMETER.this,LOG_REFERENCE);
+      end;
     END LOOP;
 END;
 
