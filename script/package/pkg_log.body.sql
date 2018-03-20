@@ -31,11 +31,12 @@ BEGIN
       from  LOG_AUDIT.t_PRIORITY;
 
       G_PRIORITY_DB:=T_PRIORITY_DB;
+      commit;
   end if;
   
 
    
-  commit;
+  
 END;
 
 function is_number(p_string in varchar2) return int is
@@ -980,9 +981,6 @@ END;
 -- Setando variaveis estaticas do ambiente
 
 BEGIN
-
-P_SET;
-
-
+  P_SET;
 
 END PKG_LOG;
