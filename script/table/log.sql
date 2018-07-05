@@ -8,13 +8,10 @@ create table LOG_AUDIT.T_log
   --log context
   ID_CONTEXT  NUMBER(10) ,
   --defines where your log can or can't run
-  priority_level NUMBER(6) not null
+  priority_level NUMBER(6) not null,
+  CONSTRAINT PK_LOG PRIMARY KEY(DATA_LOG, SEQ),
+  CONSTRAINT FK_priority FOREIGN KEY (priority_level)
+  REFERENCES LOG_AUDIT.T_priority (priority_level),
+  CONSTRAINT FK_CONTEXT FOREIGN KEY (ID_CONTEXT)
+  REFERENCES LOG_AUDIT.T_CONTEXT (ID_CONTEXT)
 );
-
-ALTER TABLE LOG_AUDIT.T_log ADD CONSTRAINT PK_LOG PRIMARY KEY(DATA_LOG, SEQ);
-
-ALTER TABLE LOG_AUDIT.T_log ADD  CONSTRAINT FK_priority FOREIGN KEY (priority_level)
-  REFERENCES LOG_AUDIT.T_priority (priority_level);
-
-ALTER TABLE LOG_AUDIT.T_log ADD  CONSTRAINT FK_CONTEXT FOREIGN KEY (ID_CONTEXT)
-  REFERENCES LOG_AUDIT.T_CONTEXT (ID_CONTEXT);

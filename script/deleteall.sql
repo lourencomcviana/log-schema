@@ -1,0 +1,10 @@
+delete log_audit.T_PARAMETER_CLOB;
+delete log_audit.T_PARAMETER_DATE;
+delete log_audit.T_PARAMETER_NUMBER;
+delete log_audit.T_PARAMETER_XML;
+delete LOG_AUDIT.T_PARAMETER;
+delete LOG_AUDIT.T_UPDATE;
+delete LOG_AUDIT.T_LOG;
+delete LOG_AUDIT.T_CONTEXT;
+delete LOG_AUDIT.T_CONTEXT_NODE;
+delete LOG_AUDIT.T_PRIORITY;

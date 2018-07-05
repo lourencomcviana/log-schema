@@ -81,26 +81,6 @@ DELETE LOG_AUDIT.T_LOG;
 
 DELETE LOG_AUDIT.T_CONTEXT;
 DELETE LOG_AUDIT.T_CONTEXT_NODE;
-
-
-
-   insert into log_audit.T_PARAMETER
-
-    select * from log_audit.T_priority
-
-  select UPPER(sys_context('userenv','service_name')),'auto-inserted'
-        from  dual;
-
-
-  
-    select *
-
-    from log_audit.t_PRIORITY
-    WHERE  UPPER(sys_context('userenv','service_name'))=database
-      or UPPER(sys_context('userenv','instance_name'))=database
-      or REGEXP_LIKE (UPPER(sys_context('userenv','instance_name')),UPPER('^'||database)||'\d*$','i')
- 
-
 */
   
 

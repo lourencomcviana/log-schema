@@ -1,0 +1,38 @@
+{
+    "encoding":"UTF-8",
+    "defaultCommandDelimiter":"^\\s*\/\\s*$",
+    "clear":{
+        "method":"none",
+        "files":{
+            "drop":  "script/dropall.sql",
+            "delete":{ "file":"script/deleteall.sql","delimiter":";"}
+        }
+    },
+    "files":[
+        "script/schema.sql",
+        "script/sequences.sql",
+        "script/table/priority.sql",
+        "script/table/context/context_node.sql",
+        "script/table/context/context.sql",
+        "script/table/log.sql",
+        "script/table/update.sql",
+        "script/table/parameter/parameter.sql",
+        "script/table/parameter/parameter_clob.sql",
+        "script/table/parameter/parameter_date.sql",
+        "script/table/parameter/parameter_number.sql",
+        "script/table/parameter/parameter_xml.sql",
+        "script/view/v_update.sql",
+        "script/view/v_context.sql",
+        "script/view/v_parameter.sql",
+        "script/view/v_priority.sql",
+        "script/view/v_log.sql",
+        "script/view/v_log_recent.sql",
+        "script/package/pkg_util.head.sql",
+        "script/package/pkg_util.body.sql",
+        "script/package/pkg_log.head.sql",
+        "script/package/pkg_log.body.sql",
+        "script/package/pkg_log_i.body.sql",
+        "script/package/pkg_log_i.head.sql",
+        {"file":"script/role.sql","delimiter":";"}
+    ]
+}

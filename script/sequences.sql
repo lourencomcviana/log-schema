@@ -5,7 +5,7 @@ CREATE SEQUENCE log_audit.seq_increment
  MAXVALUE 50
  CACHE 20
  CYCLE;
-
+/
 CREATE SEQUENCE log_audit.seq_CONTEXT
  START WITH     1
  INCREMENT BY   1
