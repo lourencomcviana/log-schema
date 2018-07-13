@@ -2,7 +2,7 @@
     "encoding":"UTF-8",
     "defaultCommandDelimiter":"^\\s*\/\\s*$",
     "clear":{
-        "method":"none",
+        "method":"drop",
         "files":{
             "drop":  "script/dropall.sql",
             "delete":{ "file":"script/deleteall.sql","delimiter":";"}
@@ -31,8 +31,8 @@
         "script/package/pkg_util.body.sql",
         "script/package/pkg_log.head.sql",
         "script/package/pkg_log.body.sql",
-        "script/package/pkg_log_i.body.sql",
         "script/package/pkg_log_i.head.sql",
+        "script/package/pkg_log_i.body.sql",
         {"file":"script/role.sql","delimiter":";"}
     ]
 }
