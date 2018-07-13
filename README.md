@@ -18,7 +18,7 @@ log schema for relational databases.
 run scripts inside script folder in the order described in [config.json - files](config.json)
 You can use any sql client you like.
 
-### Configuration
+## Configuration
 In general, the app was made to require minimun modifications to [config.json](config.json). But if you want to mess around, fell free to do it.
 
 At the file [config.json](config.json) you can change:
@@ -28,6 +28,9 @@ At the file [config.json](config.json) you can change:
   - method: name of the cleaning method
   - files: object containing all avaliable methods
 - files: files to be run. Can be only a string containing the path of the file or a object containing the path of the file and a custom commando delimiter for that file.
+
+## Using
+see [helloWorld.sql](example/helloWorld.sql) for usage examples
 
 ## Observations
 - the package `log_audit.pkg_log_i` exists only as an interface. No logic asside clob to xml and vice-versa is involved. The conversion is necessary because oracle drivers for xmltype tend to be obscure to use. Sending/reciving a clob from an application is way easyer and will work with almost all drivers.
