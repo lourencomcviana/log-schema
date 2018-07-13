@@ -180,7 +180,8 @@ function parseScript(fileConfig){
         e=e.trim();
        
         e=e.replace(/--.*/g,"");
-        e=e.replace(/\s*;\s*$/,"");
+        // e=e.replace(/\s*;\s*$/,"");
+        
         sqlScript=new SqlScript(e,fileConfig);
 
         return sqlScript;
@@ -197,7 +198,7 @@ class SqlScript{
     }
 }
 
-function oraclePromise(script,connection){
+function oraclePromise(script,connection,previousErr){
     return new Promise(function(resolve,reject){
         if(!script){
             resolve()
@@ -217,7 +218,18 @@ function oraclePromise(script,connection){
                 })
                 .catch(function(err) {
                     conn.close().then(e=>{
-                        reject( err);
+                        if(!previousErr){
+                            
+                            oraclePromise(script.replace(/\s*;\s*$/,""),connection,993)
+                            .then(saida=>{
+                                resolve(saida)
+                            }).catch(err=>{
+                                reject( err);
+                            });
+                        }else{
+                            reject( err);
+                        }
+                        
                     });
                 });
             })
