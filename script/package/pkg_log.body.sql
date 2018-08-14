@@ -500,7 +500,7 @@ create or replace PACKAGE BODY  LOG_AUDIT.PKG_LOG IS
       P_ADD_PRIVATE(P_name, p_Value, LOG_REFERENCE, 0, T_data, t_seq, t_update);
     end;
 
-  PROCEDURE P_LOG_PRIVATE(P_Mensagem IN CLOB, P_PRIORITY IN NUMBER, P_CONTEXT IN Varchar2, LOG_REFERENCE IN OUT XMLTYPE) AS
+  PROCEDURE P_LOG_PRIVATE(P_Mensagem IN CLOB, LOG_REFERENCE IN OUT XMLTYPE) AS
     PRAGMA AUTONOMOUS_TRANSACTION;
     T_data     timestamp(6); --data inicial do log
     T_seq      number(3);
@@ -633,16 +633,8 @@ create or replace PACKAGE BODY  LOG_AUDIT.PKG_LOG IS
               INTO T_PRIORITY
               FROM LOG_AUDIT.t_Log L
               WHERE L.DATA_LOG = T_DATA AND L.SEQ = T_SEQ;
-              EXCEPTION WHEN OTHERS
-              THEN
-
-                DECLARE
-                  T_ERR_XML XMLTYPE;
-                BEGIN
-                  P_LOG_PRIVATE(SQLERRM,1,'LOG.ERRO',T_ERR_XML);
-
-                END;
-                --T_PRIORITY := NULL;
+            EXCEPTION WHEN
+              OTHERS THEN T_PRIORITY:=T_PRIORITY;
             END;
           END IF;
 
@@ -743,10 +735,12 @@ create or replace PACKAGE BODY  LOG_AUDIT.PKG_LOG IS
   PROCEDURE P_LOG(P_Mensagem IN VARCHAR2, P_PRIORITY IN NUMBER, P_CONTEXT IN Varchar2, LOG_REFERENCE IN OUT XMLTYPE) AS
     PRAGMA AUTONOMOUS_TRANSACTION;
     BEGIN
+
       -- EVALUATE LOG CONTEXT AND PRIORITY
       P_CONTEXT_PRIORITY(P_PRIORITY, p_CONTEXT, LOG_REFERENCE);
       -- SAVE LOG FOR THAT CONFIGURATION
-      P_LOG_PRIVATE(P_Mensagem,P_PRIORITY,P_CONTEXT,LOG_REFERENCE);
+      P_LOG_PRIVATE(P_Mensagem,LOG_REFERENCE);
+      commit;
     END P_LOG;
 
 
